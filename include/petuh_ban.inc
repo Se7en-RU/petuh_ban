@@ -1,0 +1,1 @@
+native void Petuh_Ban(int iClient);
