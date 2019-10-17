@@ -62,7 +62,7 @@ public Action ClientPostWeaponEquip(int client, int weapon)
         char sWeapon[64]; 
         GetEntPropString(weapon, Prop_Data, "m_iClassname", sWeapon, sizeof(sWeapon));
 
-        if(StrContains(sWeapon, "weapon_knife", false) == -1) {
+        if(StrContains(sWeapon, "weapon_knife", false) == -1 && StrContains(sWeapon, "weapon_bayonet", false) == -1) {
             if(weapon > 0 && IsValidEntity(weapon)) {
                 RemovePlayerItem(client, weapon);
                 AcceptEntityInput(weapon, "Kill");
