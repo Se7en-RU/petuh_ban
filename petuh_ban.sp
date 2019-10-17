@@ -3,8 +3,12 @@
 #include <sdktools>
 #include <sdkhooks>
 #include <chat-processor>
+#include <fpvm_interface>
 
 #pragma newdecls required
+
+#define MODEL "models/isony/Twenty_Three/knifes/is_penis_flex/is_v_penis_flex.mdl"
+#define WORLD_MODEL "models/isony/Twenty_Three/knifes/is_penis_flex/is_w_penis_flex.mdl"
 
 bool PLAYER_BANNED[MAXPLAYERS+1] = {false,...};
 char BanMessages[][] = {
@@ -12,6 +16,8 @@ char BanMessages[][] = {
     "Кудах-тах-тах",
     "Кукареку",
 };
+int g_Model;
+int g_WorldModel;
 
 public Plugin myinfo = 
 {
@@ -25,6 +31,15 @@ public void OnPluginStart()
 {
 	if(GetEngineVersion() != Engine_CSGO)
 		SetFailState("Плагин предназначен только для CS:GO");
+	
+	RegAdminCmd("sm_test", TestCmd, ADMFLAG_ROOT);
+}
+
+public Action TestCmd(int client, any Args)
+{
+	MakePetuh(client);
+
+	return Plugin_Handled;
 }
 
 public APLRes AskPluginLoad2(Handle hMyself, bool bLate, char[] sError, int iErr_max) 
@@ -34,7 +49,7 @@ public APLRes AskPluginLoad2(Handle hMyself, bool bLate, char[] sError, int iErr
 
     RegPluginLibrary("petuh");
 
-    return APLRes_Success; // Для продолжения загрузки плагина нужно вернуть APLRes_Success
+    return APLRes_Success;
 }
 
 public void OnClientPutInServer(int client)	
@@ -44,6 +59,28 @@ public void OnClientPutInServer(int client)
 
     ResetClient(client);
 }
+
+public void OnMapStart()
+{ 
+	g_Model = PrecacheModel(MODEL);
+	g_WorldModel = PrecacheModel(WORLD_MODEL);
+	
+	// model downloads
+	AddFileToDownloadsTable("materials/models/isony/Twenty_Three/knifes/is_penis_flex/is_penis.vmt");
+	AddFileToDownloadsTable("materials/models/isony/Twenty_Three/knifes/is_penis_flex/is_penis.vtf");
+	AddFileToDownloadsTable("materials/models/isony/Twenty_Three/knifes/is_penis_flex/is_penis_normal.vtf");
+	AddFileToDownloadsTable("models/isony/Twenty_Three/knifes/is_penis_flex/is_v_penis_flex.dx90.vtx");
+	AddFileToDownloadsTable("models/isony/Twenty_Three/knifes/is_penis_flex/is_v_penis_flex.mdl");
+	AddFileToDownloadsTable("models/isony/Twenty_Three/knifes/is_penis_flex/is_v_penis_flex.vvd");
+	AddFileToDownloadsTable("models/isony/Twenty_Three/knifes/is_penis_flex/is_w_penis_flex.dx90.vtx");
+	AddFileToDownloadsTable("models/isony/Twenty_Three/knifes/is_penis_flex/is_w_penis_flex.mdl");
+	AddFileToDownloadsTable("models/isony/Twenty_Three/knifes/is_penis_flex/is_w_penis_flex.phy");
+	AddFileToDownloadsTable("models/isony/Twenty_Three/knifes/is_penis_flex/is_w_penis_flex.vvd");
+	AddFileToDownloadsTable("models/isony/Twenty_Three/knifes/is_penis_flex/is_w_penis_flex_dropped.dx90.vtx");
+	AddFileToDownloadsTable("models/isony/Twenty_Three/knifes/is_penis_flex/is_w_penis_flex_dropped.mdl");
+	AddFileToDownloadsTable("models/isony/Twenty_Three/knifes/is_penis_flex/is_w_penis_flex_dropped.phy");
+	AddFileToDownloadsTable("models/isony/Twenty_Three/knifes/is_penis_flex/is_w_penis_flex_dropped.vvd");
+} 
 
 // Кикаем петушков в конце игры
 public void OnMapEnd()
@@ -58,15 +95,18 @@ public void OnMapEnd()
 
 public Action ClientPostWeaponEquip(int client, int weapon)
 {
-    if(IsValidClient(client, true)) {
+    if(IsValidClient(client, true) && IsClientBanned(client)) {
         char sWeapon[64]; 
         GetEntPropString(weapon, Prop_Data, "m_iClassname", sWeapon, sizeof(sWeapon));
 
-        if(StrContains(sWeapon, "weapon_knife", false) == -1 && StrContains(sWeapon, "weapon_bayonet", false) == -1) {
-            if(weapon > 0 && IsValidEntity(weapon)) {
+        if(StrContains(sWeapon, "weapon_knife", false) == -1 && StrContains(sWeapon, "weapon_bayonet", false) == -1)
+		{
+            if(weapon > 0 && IsValidEntity(weapon))
+			{
                 RemovePlayerItem(client, weapon);
                 AcceptEntityInput(weapon, "Kill");
-            }
+                FakeClientCommand(client, "use weapon_knife");
+			}
         }
     }
 }
@@ -81,11 +121,11 @@ public Action ClientTakeDamage(int client, int &attacker, int &inflictor, float 
 	return Plugin_Continue;
 }
 
-public Action OnChatMessage(int& author, Handle recipients, char[] name, char[] message)
+public Action CP_OnChatMessage(int& author, ArrayList recipients, char[] flagstring, char[] name, char[] message, bool& processcolors, bool& removecolors)
 {
 	if(IsClientBanned(author)) {
         int iMessage = GetRandomInt(0, sizeof(BanMessages)-1);
-        Format(message, (MAXLENGTH_MESSAGE - strlen(name) - 5), "%s", BanMessages[iMessage]);
+        Format(message, (MAXLENGTH_MESSAGE - strlen(name) - 5), "\x01%s", BanMessages[iMessage]);
 
         return Plugin_Changed;
 	}
@@ -103,11 +143,19 @@ stock void RemoveWeapons(int client)
 	int iWeapon;
 	for(int i = 0; i <= 5; i++)
 	{
-        if(i == 2) continue; // Не забираем нож
-        while((iWeapon = GetPlayerWeaponSlot(client, i)) != -1)
-		{
-			RemovePlayerItem(client, iWeapon);
-			AcceptEntityInput(iWeapon, "kill");
+        if(i == 2) {
+			iWeapon = GetPlayerWeaponSlot(client, i);
+			char sKnifeName[64];
+			GetEntityClassname(iWeapon, sKnifeName, sizeof(sKnifeName));
+			
+			FPVMI_AddViewModelToClient(client, sKnifeName, g_Model);
+			FPVMI_AddWorldModelToClient(client, sKnifeName, g_WorldModel);
+		} else {
+			while((iWeapon = GetPlayerWeaponSlot(client, i)) != -1)
+			{
+				RemovePlayerItem(client, iWeapon);
+				AcceptEntityInput(iWeapon, "kill");
+			}
 		}
 	}
 }
@@ -131,10 +179,11 @@ void MakePetuh(int client)
 {
     if(IsValidClient(client)) {
         PLAYER_BANNED[client] = true; // Флаг бана
-        
         FakeClientCommand(client, "use weapon_knife");
         RemoveWeapons(client); // Убираем оружие
         SetClientListeningFlags(client, 1); // Мут игрока
+
+		PrintToChatAll("\x04%N\x01 стал петухом!", client);
 
         // TODO Звук петушка, сообщение?
         // TODO Сюда вставляем хуй
