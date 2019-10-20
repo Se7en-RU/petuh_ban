@@ -31,23 +31,15 @@ public void OnPluginStart()
 {
 	if(GetEngineVersion() != Engine_CSGO)
 		SetFailState("Плагин предназначен только для CS:GO");
-	
-	RegAdminCmd("sm_test", TestCmd, ADMFLAG_ROOT);
-}
-
-public Action TestCmd(int client, any Args)
-{
-	MakePetuh(client);
-
-	return Plugin_Handled;
 }
 
 public APLRes AskPluginLoad2(Handle hMyself, bool bLate, char[] sError, int iErr_max) 
 {
 
     CreateNative("Petuh_Ban", Native_BanPlayer);
+    CreateNative("Petuh_IsPetuh", Native_CheckPlayer);
 
-    RegPluginLibrary("petuh");
+    RegPluginLibrary("petuh_ban");
 
     return APLRes_Success;
 }
@@ -182,10 +174,7 @@ void MakePetuh(int client)
         FakeClientCommand(client, "use weapon_knife");
         RemoveWeapons(client); // Убираем оружие
         SetClientListeningFlags(client, 1); // Мут игрока
-
-		PrintToChatAll("\x04%N\x01 стал петухом!", client);
-
-        // TODO Звук петушка, сообщение?
+		// TODO Звук петушка, сообщение?
         // TODO Сюда вставляем хуй
     }
 }
@@ -196,4 +185,10 @@ public int Native_BanPlayer(Handle hPlugin, int iNumParams)
     MakePetuh(client);
 
     return 0;
+}
+
+public int Native_CheckPlayer(Handle hPlugin, int iNumParams)
+{
+    int client = GetNativeCell(1);
+    return IsClientBanned(client);
 }
