@@ -18,12 +18,13 @@ char BanMessages[][] = {
 };
 int g_Model;
 int g_WorldModel;
+char g_sKnifeName[MAXPLAYERS+1][64];
 
 public Plugin myinfo = 
 {
 	name = "Petuh ban",
-	author = "Se7en",
-	version = "0.0.1",
+	author = "Se7en, iSony",
+	version = "1.0",
 	url = "https://csgo.su"
 };
 
@@ -31,6 +32,10 @@ public void OnPluginStart()
 {
 	if(GetEngineVersion() != Engine_CSGO)
 		SetFailState("Плагин предназначен только для CS:GO");
+
+	HookEvent("player_spawn", Event_PlayerSpawn, EventHookMode_Pre);
+
+	RegAdminCmd("sm_petuh", AdminCommand_Petuh, ADMFLAG_ROOT);
 }
 
 public APLRes AskPluginLoad2(Handle hMyself, bool bLate, char[] sError, int iErr_max) 
@@ -135,19 +140,11 @@ stock void RemoveWeapons(int client)
 	int iWeapon;
 	for(int i = 0; i <= 5; i++)
 	{
-        if(i == 2) {
-			iWeapon = GetPlayerWeaponSlot(client, i);
-			char sKnifeName[64];
-			GetEntityClassname(iWeapon, sKnifeName, sizeof(sKnifeName));
-			
-			FPVMI_AddViewModelToClient(client, sKnifeName, g_Model);
-			FPVMI_AddWorldModelToClient(client, sKnifeName, g_WorldModel);
-		} else {
-			while((iWeapon = GetPlayerWeaponSlot(client, i)) != -1)
-			{
-				RemovePlayerItem(client, iWeapon);
-				AcceptEntityInput(iWeapon, "kill");
-			}
+		if(i == 2) continue;
+		while((iWeapon = GetPlayerWeaponSlot(client, i)) != -1)
+		{
+			RemovePlayerItem(client, iWeapon);
+			AcceptEntityInput(iWeapon, "kill");
 		}
 	}
 }
@@ -159,7 +156,8 @@ bool IsClientBanned(int client)
 
 void ResetClient(int client)
 {
-    PLAYER_BANNED[client] = false;
+	PLAYER_BANNED[client] = false;
+	g_sKnifeName[client] = "";
 }
 
 stock bool IsValidClient(int client, bool bAlive = false)
@@ -169,13 +167,36 @@ stock bool IsValidClient(int client, bool bAlive = false)
 
 void MakePetuh(int client)
 {
-    if(IsValidClient(client)) {
-        PLAYER_BANNED[client] = true; // Флаг бана
-        FakeClientCommand(client, "use weapon_knife");
-        RemoveWeapons(client); // Убираем оружие
-        SetClientListeningFlags(client, 1); // Мут игрока
+	if(IsValidClient(client)) {
+		PLAYER_BANNED[client] = true; // Флаг бана
+		
+		if(IsPlayerAlive(client)) {
+			FakeClientCommand(client, "use weapon_knife");
+			RemoveWeapons(client); // Убираем оружие
+		}
+			
+		FPVMI_AddViewModelToClient(client, g_sKnifeName[client], g_Model);
+		FPVMI_AddWorldModelToClient(client, g_sKnifeName[client], g_WorldModel);
+		
+		SetClientListeningFlags(client, 1); // Мут игрока
 		// TODO Звук петушка, сообщение?
         // TODO Сюда вставляем хуй
+    }
+}
+
+void DelPetuh(int client)
+{
+	if(IsValidClient(client)) {
+		PLAYER_BANNED[client] = false; // Флаг бана
+		
+		SetClientListeningFlags(client, 0); // Анмут игрока
+
+		int iWeapon;
+		iWeapon = GetPlayerWeaponSlot(client, 2);
+		GetEntityClassname(iWeapon, g_sKnifeName[client], 64);
+		
+		FPVMI_RemoveViewModelToClient(client, g_sKnifeName[client]);
+		FPVMI_RemoveWorldModelToClient(client, g_sKnifeName[client]);
     }
 }
 
@@ -191,4 +212,54 @@ public int Native_CheckPlayer(Handle hPlugin, int iNumParams)
 {
     int client = GetNativeCell(1);
     return IsClientBanned(client);
+}
+
+public Action AdminCommand_Petuh(int client, any args)
+{
+	if (args < 1)
+	{
+		ReplyToCommand(client, "Usage: sm_petuh <#userid|name>");
+		
+		return Plugin_Handled;
+	}
+
+	char Arguments[256];
+	GetCmdArgString(Arguments, sizeof(Arguments));
+
+	char arg[65];
+	BreakString(Arguments, arg, sizeof(arg));
+
+	int target = FindTarget(client, arg, true);
+	if (target == -1) {
+		return Plugin_Handled;
+	}
+
+
+	if(!IsClientBanned(client)) {
+		MakePetuh(client);
+	} else {
+		DelPetuh(client);
+	}
+
+	return Plugin_Handled;
+}
+
+public Action Event_PlayerSpawn(Event hEvent, const char[] sEvName, bool bDontBroadcast)
+{
+	RequestFrame(PlayerSpawned, hEvent.GetInt("userid"));
+}
+
+void PlayerSpawned(int UserID)
+{
+	int client = GetClientOfUserId(UserID);
+
+	if(IsValidClient(client)) {
+		int iWeapon = GetPlayerWeaponSlot(client, 2);
+		GetEntityClassname(iWeapon, g_sKnifeName[client], 64);
+
+		if(IsClientBanned(client) && FPVMI_GetClientViewModel(client, g_sKnifeName[client]) == -1) {
+			FPVMI_AddViewModelToClient(client, g_sKnifeName[client], g_Model);
+			FPVMI_AddWorldModelToClient(client, g_sKnifeName[client], g_WorldModel);
+		}
+	}
 }
