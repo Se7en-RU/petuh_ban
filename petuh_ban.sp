@@ -190,10 +190,6 @@ void DelPetuh(int client)
 		PLAYER_BANNED[client] = false; // Флаг бана
 		
 		SetClientListeningFlags(client, 0); // Анмут игрока
-
-		int iWeapon;
-		iWeapon = GetPlayerWeaponSlot(client, 2);
-		GetEntityClassname(iWeapon, g_sKnifeName[client], 64);
 		
 		FPVMI_RemoveViewModelToClient(client, g_sKnifeName[client]);
 		FPVMI_RemoveWorldModelToClient(client, g_sKnifeName[client]);
@@ -235,10 +231,10 @@ public Action AdminCommand_Petuh(int client, any args)
 	}
 
 
-	if(!IsClientBanned(client)) {
-		MakePetuh(client);
+	if(!IsClientBanned(target)) {
+		MakePetuh(target);
 	} else {
-		DelPetuh(client);
+		DelPetuh(target);
 	}
 
 	return Plugin_Handled;
