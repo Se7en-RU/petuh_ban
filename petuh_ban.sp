@@ -33,7 +33,7 @@ public void OnPluginStart()
 	if(GetEngineVersion() != Engine_CSGO)
 		SetFailState("Плагин предназначен только для CS:GO");
 
-	HookEvent("player_spawn", Event_PlayerSpawn, EventHookMode_Pre);
+	HookEvent("player_spawn", Event_PlayerSpawn, EventHookMode_Post);
 
 	RegAdminCmd("sm_petuh", AdminCommand_Petuh, ADMFLAG_ROOT);
 }
@@ -249,7 +249,7 @@ void PlayerSpawned(int UserID)
 {
 	int client = GetClientOfUserId(UserID);
 
-	if(IsValidClient(client)) {
+	if(IsValidClient(client, true)) {
 		int iWeapon = GetPlayerWeaponSlot(client, 2);
 		GetEntityClassname(iWeapon, g_sKnifeName[client], 64);
 
