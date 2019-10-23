@@ -24,7 +24,7 @@ public Plugin myinfo =
 {
 	name = "Petuh ban",
 	author = "Se7en, iSony",
-	version = "1.0",
+	version = "1.1",
 	url = "https://csgo.su"
 };
 
@@ -34,6 +34,8 @@ public void OnPluginStart()
 		SetFailState("Плагин предназначен только для CS:GO");
 
 	HookEvent("player_spawn", Event_PlayerSpawn, EventHookMode_Post);
+
+	LoadTranslations("common.phrases");
 
 	RegAdminCmd("sm_petuh", AdminCommand_Petuh, ADMFLAG_ROOT);
 }
