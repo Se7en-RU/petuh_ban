@@ -2,6 +2,7 @@
 #include <sourcemod>
 #include <sdktools>
 #include <sdkhooks>
+#include <cstrike>
 #include <chat-processor>
 #include <fpvm_interface>
 
@@ -19,12 +20,13 @@ char BanMessages[][] = {
 int g_Model;
 int g_WorldModel;
 char g_sKnifeName[MAXPLAYERS+1][64];
+char chickenPanicSounds[][] =  { "ambient/creatures/chicken_panic_01.wav", "ambient/creatures/chicken_panic_02.wav", "ambient/creatures/chicken_panic_03.wav", "ambient/creatures/chicken_panic_04.wav" };
 
 public Plugin myinfo = 
 {
 	name = "Petuh ban",
 	author = "Se7en, iSony",
-	version = "1.1",
+	version = "1.2",
 	url = "https://csgo.su"
 };
 
@@ -53,10 +55,10 @@ public APLRes AskPluginLoad2(Handle hMyself, bool bLate, char[] sError, int iErr
 
 public void OnClientPutInServer(int client)	
 {
-    SDKHook(client, SDKHook_OnTakeDamage, ClientTakeDamage);
-    SDKHook(client, SDKHook_WeaponEquipPost, ClientPostWeaponEquip);
-
-    ResetClient(client);
+	SDKHook(client, SDKHook_OnTakeDamage, ClientTakeDamage);
+	SDKHook(client, SDKHook_WeaponCanUse, OnWeaponCanUse);
+	
+	ResetClient(client);
 }
 
 public void OnMapStart()
@@ -92,22 +94,22 @@ public void OnMapEnd()
 	}
 }
 
-public Action ClientPostWeaponEquip(int client, int weapon)
+public Action OnWeaponCanUse(int client, int weapon)
 {
-    if(IsValidClient(client, true) && IsClientBanned(client)) {
-        char sWeapon[64]; 
-        GetEntPropString(weapon, Prop_Data, "m_iClassname", sWeapon, sizeof(sWeapon));
+	if(IsValidEntity(weapon) && IsClientBanned(client)) {
+		return Plugin_Handled;
+	}
 
-        if(StrContains(sWeapon, "weapon_knife", false) == -1 && StrContains(sWeapon, "weapon_bayonet", false) == -1)
-		{
-            if(weapon > 0 && IsValidEntity(weapon))
-			{
-                RemovePlayerItem(client, weapon);
-                AcceptEntityInput(weapon, "Kill");
-                FakeClientCommand(client, "use weapon_knife");
-			}
-        }
-    }
+	return Plugin_Continue;
+}
+
+public Action CS_OnBuyCommand(int client, const char[] sWeapon)
+{
+	if(IsClientBanned(client)) {
+		return Plugin_Handled;
+	}
+	
+	return Plugin_Continue;
 }
 
 public Action ClientTakeDamage(int client, int &attacker, int &inflictor, float &damage, int &damagetype) 
@@ -123,10 +125,14 @@ public Action ClientTakeDamage(int client, int &attacker, int &inflictor, float 
 public Action CP_OnChatMessage(int& author, ArrayList recipients, char[] flagstring, char[] name, char[] message, bool& processcolors, bool& removecolors)
 {
 	if(IsClientBanned(author)) {
-        int iMessage = GetRandomInt(0, sizeof(BanMessages)-1);
-        Format(message, (MAXLENGTH_MESSAGE - strlen(name) - 5), "\x01%s", BanMessages[iMessage]);
-
-        return Plugin_Changed;
+		int iMessage = GetRandomInt(0, sizeof(BanMessages)-1);
+		Format(message, (MAXLENGTH_MESSAGE - strlen(name) - 5), "\x01%s", BanMessages[iMessage]);
+		
+		if(IsPlayerAlive(author)) {
+			PlaySound(author);
+		}
+		
+		return Plugin_Changed;
 	}
 
 	return Plugin_Continue;
@@ -175,14 +181,14 @@ void MakePetuh(int client)
 		if(IsPlayerAlive(client)) {
 			FakeClientCommand(client, "use weapon_knife");
 			RemoveWeapons(client); // Убираем оружие
+			PlaySound(client);
 		}
 			
 		FPVMI_AddViewModelToClient(client, g_sKnifeName[client], g_Model);
 		FPVMI_AddWorldModelToClient(client, g_sKnifeName[client], g_WorldModel);
 		
 		SetClientListeningFlags(client, 1); // Мут игрока
-		// TODO Звук петушка, сообщение?
-        // TODO Сюда вставляем хуй
+		PrintToChat(client, "Вам был отключен голосовой чат!");
     }
 }
 
@@ -251,6 +257,8 @@ void PlayerSpawned(int UserID)
 {
 	int client = GetClientOfUserId(UserID);
 
+	// RemoveWeapons(client);
+
 	if(IsValidClient(client, true)) {
 		int iWeapon = GetPlayerWeaponSlot(client, 2);
 		GetEntityClassname(iWeapon, g_sKnifeName[client], 64);
@@ -260,4 +268,13 @@ void PlayerSpawned(int UserID)
 			FPVMI_AddWorldModelToClient(client, g_sKnifeName[client], g_WorldModel);
 		}
 	}
+}
+
+
+void PlaySound(int client)
+{
+	//Channel: 4 | Level: 65 | Volume: 0.899902 | Pitch: 102
+	int pitch = GetRandomInt(90, 110);
+	int rdmSound = GetRandomInt(0, sizeof(chickenPanicSounds) - 1);
+	EmitSoundToAll(chickenPanicSounds[rdmSound], client, 4, 65, 0, 0.9, pitch);
 }
