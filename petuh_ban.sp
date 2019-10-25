@@ -12,21 +12,19 @@
 #define WORLD_MODEL "models/isony/Twenty_Three/knifes/is_penis_flex/is_w_penis_flex.mdl"
 
 bool PLAYER_BANNED[MAXPLAYERS+1] = {false,...};
-char BanMessages[][] = {
-    "Ко-ко-ко",
-    "Кудах-тах-тах",
-    "Кукареку",
-};
+Handle g_hSoundTimer[MAXPLAYERS+1] = INVALID_HANDLE;
 int g_Model;
 int g_WorldModel;
 char g_sKnifeName[MAXPLAYERS+1][64];
+char BanMessages[][] = {"Ко-ко-ко", "Кудах-тах-тах", "Кукареку",};
+char chickenIdleSounds[][] =  { "ambient/creatures/chicken_idle_01.wav", "ambient/creatures/chicken_idle_02.wav", "ambient/creatures/chicken_idle_03.wav" };
 char chickenPanicSounds[][] =  { "ambient/creatures/chicken_panic_01.wav", "ambient/creatures/chicken_panic_02.wav", "ambient/creatures/chicken_panic_03.wav", "ambient/creatures/chicken_panic_04.wav" };
 
 public Plugin myinfo = 
 {
 	name = "Petuh ban",
 	author = "Se7en, iSony",
-	version = "1.2",
+	version = "1.3",
 	url = "https://csgo.su"
 };
 
@@ -35,11 +33,11 @@ public void OnPluginStart()
 	if(GetEngineVersion() != Engine_CSGO)
 		SetFailState("Плагин предназначен только для CS:GO");
 
-	HookEvent("player_spawn", Event_PlayerSpawn, EventHookMode_Post);
-
 	LoadTranslations("common.phrases");
 
-	RegAdminCmd("sm_petuh", AdminCommand_Petuh, ADMFLAG_ROOT);
+	HookEvent("player_spawn", Event_PlayerSpawn, EventHookMode_Post);
+
+	RegConsoleCmd("sm_admintest", Command_Admintest);
 }
 
 public APLRes AskPluginLoad2(Handle hMyself, bool bLate, char[] sError, int iErr_max) 
@@ -51,14 +49,6 @@ public APLRes AskPluginLoad2(Handle hMyself, bool bLate, char[] sError, int iErr
     RegPluginLibrary("petuh_ban");
 
     return APLRes_Success;
-}
-
-public void OnClientPutInServer(int client)	
-{
-	SDKHook(client, SDKHook_OnTakeDamage, ClientTakeDamage);
-	SDKHook(client, SDKHook_WeaponCanUse, OnWeaponCanUse);
-	
-	ResetClient(client);
 }
 
 public void OnMapStart()
@@ -92,6 +82,14 @@ public void OnMapEnd()
 
         KickClient(i, "Твоё время вышло, петушок!");
 	}
+}
+
+public void OnClientPutInServer(int client)	
+{
+	SDKHook(client, SDKHook_OnTakeDamage, ClientTakeDamage);
+	SDKHook(client, SDKHook_WeaponCanUse, OnWeaponCanUse);
+	
+	ResetClient(client);
 }
 
 public Action OnWeaponCanUse(int client, int weapon)
@@ -164,6 +162,7 @@ bool IsClientBanned(int client)
 
 void ResetClient(int client)
 {
+	RemoveSoundTimer(client);
 	PLAYER_BANNED[client] = false;
 	g_sKnifeName[client] = "";
 }
@@ -182,25 +181,13 @@ void MakePetuh(int client)
 			FakeClientCommand(client, "use weapon_knife");
 			RemoveWeapons(client); // Убираем оружие
 			PlaySound(client);
+			CreateSoundTimer(client);
 		}
 			
-		FPVMI_AddViewModelToClient(client, g_sKnifeName[client], g_Model);
-		FPVMI_AddWorldModelToClient(client, g_sKnifeName[client], g_WorldModel);
+		SetKnifeModel(client);
 		
 		SetClientListeningFlags(client, 1); // Мут игрока
 		PrintToChat(client, "Вам был отключен голосовой чат!");
-    }
-}
-
-void DelPetuh(int client)
-{
-	if(IsValidClient(client)) {
-		PLAYER_BANNED[client] = false; // Флаг бана
-		
-		SetClientListeningFlags(client, 0); // Анмут игрока
-		
-		FPVMI_RemoveViewModelToClient(client, g_sKnifeName[client]);
-		FPVMI_RemoveWorldModelToClient(client, g_sKnifeName[client]);
     }
 }
 
@@ -218,36 +205,6 @@ public int Native_CheckPlayer(Handle hPlugin, int iNumParams)
     return IsClientBanned(client);
 }
 
-public Action AdminCommand_Petuh(int client, any args)
-{
-	if (args < 1)
-	{
-		ReplyToCommand(client, "Usage: sm_petuh <#userid|name>");
-		
-		return Plugin_Handled;
-	}
-
-	char Arguments[256];
-	GetCmdArgString(Arguments, sizeof(Arguments));
-
-	char arg[65];
-	BreakString(Arguments, arg, sizeof(arg));
-
-	int target = FindTarget(client, arg, true);
-	if (target == -1) {
-		return Plugin_Handled;
-	}
-
-
-	if(!IsClientBanned(target)) {
-		MakePetuh(target);
-	} else {
-		DelPetuh(target);
-	}
-
-	return Plugin_Handled;
-}
-
 public Action Event_PlayerSpawn(Event hEvent, const char[] sEvName, bool bDontBroadcast)
 {
 	RequestFrame(PlayerSpawned, hEvent.GetInt("userid"));
@@ -263,18 +220,62 @@ void PlayerSpawned(int UserID)
 		int iWeapon = GetPlayerWeaponSlot(client, 2);
 		GetEntityClassname(iWeapon, g_sKnifeName[client], 64);
 
-		if(IsClientBanned(client) && FPVMI_GetClientViewModel(client, g_sKnifeName[client]) == -1) {
-			FPVMI_AddViewModelToClient(client, g_sKnifeName[client], g_Model);
-			FPVMI_AddWorldModelToClient(client, g_sKnifeName[client], g_WorldModel);
+		if(IsClientBanned(client)) {
+			CreateSoundTimer(client);
+			SetKnifeModel(client);
 		}
 	}
 }
 
+public Action Command_Admintest(int client, int args)
+{
+	if(IsValidClient(client, true) && !IsClientBanned(client)) {
+		SetKnifeModel(client);
+	}
+}
+
+public Action Timer_Sound(Handle hTimer, int UserID)
+{
+	int client = GetClientOfUserId(UserID);
+
+	if(IsValidClient(client, true)) {
+		PlaySoundIdle(client);
+	} else {
+		RemoveSoundTimer(client);
+	}
+}
 
 void PlaySound(int client)
 {
-	//Channel: 4 | Level: 65 | Volume: 0.899902 | Pitch: 102
-	int pitch = GetRandomInt(90, 110);
-	int rdmSound = GetRandomInt(0, sizeof(chickenPanicSounds) - 1);
-	EmitSoundToAll(chickenPanicSounds[rdmSound], client, 4, 65, 0, 0.9, pitch);
+	int sound = GetRandomInt(0, sizeof(chickenPanicSounds) - 1);
+	EmitSoundToAll(chickenPanicSounds[sound], client);
+}
+
+void PlaySoundIdle(int client)
+{
+	int sound = GetRandomInt(0, sizeof(chickenIdleSounds) - 1);
+	EmitSoundToAll(chickenIdleSounds[sound], client);
+}
+
+void CreateSoundTimer(int client)
+{
+	RemoveSoundTimer(client);
+	g_hSoundTimer[client] = CreateTimer(10.0, Timer_Sound, client, TIMER_REPEAT|TIMER_FLAG_NO_MAPCHANGE);
+}
+
+void RemoveSoundTimer(int client)
+{
+	if (g_hSoundTimer[client] != INVALID_HANDLE)
+	{
+		KillTimer(g_hSoundTimer[client]);
+		g_hSoundTimer[client] = INVALID_HANDLE;
+	}
+}
+
+void SetKnifeModel(int client)
+{
+	if(FPVMI_GetClientViewModel(client, g_sKnifeName[client]) == -1) {
+		FPVMI_AddViewModelToClient(client, g_sKnifeName[client], g_Model);
+		FPVMI_AddWorldModelToClient(client, g_sKnifeName[client], g_WorldModel);
+	}
 }
