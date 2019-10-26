@@ -37,7 +37,7 @@ public void OnPluginStart()
 
 	HookEvent("player_spawn", Event_PlayerSpawn, EventHookMode_Post);
 
-	RegConsoleCmd("sm_admintest", Command_Admintest);
+	// RegConsoleCmd("sm_admintest", Command_Admintest);
 }
 
 public APLRes AskPluginLoad2(Handle hMyself, bool bLate, char[] sError, int iErr_max) 
