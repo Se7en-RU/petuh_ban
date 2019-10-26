@@ -95,9 +95,14 @@ public void OnClientPutInServer(int client)
 public Action OnWeaponCanUse(int client, int weapon)
 {
 	if(IsValidEntity(weapon) && IsClientBanned(client)) {
-		return Plugin_Handled;
+		char sWeapon[64];
+		GetEntPropString(weapon, Prop_Data, "m_iClassname", sWeapon, sizeof(sWeapon));
+		
+		if(StrContains(sWeapon, "weapon_knife", false) == -1 && StrContains(sWeapon, "weapon_bayonet", false) == -1) {
+			return Plugin_Handled;
+		}
 	}
-
+	
 	return Plugin_Continue;
 }
 
@@ -260,7 +265,7 @@ void PlaySoundIdle(int client)
 void CreateSoundTimer(int client)
 {
 	RemoveSoundTimer(client);
-	g_hSoundTimer[client] = CreateTimer(10.0, Timer_Sound, client, TIMER_REPEAT|TIMER_FLAG_NO_MAPCHANGE);
+	g_hSoundTimer[client] = CreateTimer(10.0, Timer_Sound, GetClientUserId(client), TIMER_REPEAT|TIMER_FLAG_NO_MAPCHANGE);
 }
 
 void RemoveSoundTimer(int client)
