@@ -24,7 +24,7 @@ public Plugin myinfo =
 {
 	name = "Petuh ban",
 	author = "Se7en, iSony",
-	version = "1.3",
+	version = "1.4",
 	url = "https://csgo.su"
 };
 
@@ -146,7 +146,7 @@ public void OnClientDisconnect(int client)
 	ResetClient(client);
 }
 
-stock void RemoveWeapons(int client)
+stock void DropWeapons(int client)
 {
 	int iWeapon;
 	for(int i = 0; i <= 5; i++)
@@ -154,8 +154,7 @@ stock void RemoveWeapons(int client)
 		if(i == 2) continue;
 		while((iWeapon = GetPlayerWeaponSlot(client, i)) != -1)
 		{
-			RemovePlayerItem(client, iWeapon);
-			AcceptEntityInput(iWeapon, "kill");
+			CS_DropWeapon(client, iWeapon, true, true);
 		}
 	}
 }
@@ -184,15 +183,12 @@ void MakePetuh(int client)
 		
 		if(IsPlayerAlive(client)) {
 			FakeClientCommand(client, "use weapon_knife");
-			RemoveWeapons(client); // Убираем оружие
+			DropWeapons(client); // Убираем оружие
 			PlaySound(client);
 			CreateSoundTimer(client);
 		}
 			
 		SetKnifeModel(client);
-		
-		SetClientListeningFlags(client, 1); // Мут игрока
-		PrintToChat(client, "Вам был отключен голосовой чат!");
     }
 }
 
@@ -218,8 +214,6 @@ public Action Event_PlayerSpawn(Event hEvent, const char[] sEvName, bool bDontBr
 void PlayerSpawned(int UserID)
 {
 	int client = GetClientOfUserId(UserID);
-
-	// RemoveWeapons(client);
 
 	if(IsValidClient(client, true)) {
 		int iWeapon = GetPlayerWeaponSlot(client, 2);
